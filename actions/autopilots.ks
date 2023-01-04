@@ -1,0 +1,1 @@
+global autopilot_running is false.
