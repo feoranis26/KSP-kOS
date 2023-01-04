@@ -1,6 +1,6 @@
 parameter land_tgt, hoverslam_height is 25, safety_margin is 0.7, touchdown_spd is 2.
 
-set C_RCS_POWER to 1.
+set C_RCS_POWER to 0.2.
 set C_CANCEL_CORR_MAG to 0.5.
 set C_ROCKET_HEIGHT to 50.
 set C_HDESCENT_TRANSLATION_MAG to 0.2.
@@ -129,7 +129,7 @@ set mainengine:thrustlimit to 0.
 unlock yawc.
 unlock rollc.
 lock throttle to 1.
-lock steering to lookdirup(-velocity:surface, v(0, -1, 0)).
+lock steering to lookdirup(-(velocity:surface:normalized + translationvector:normalized * 0.3), v(0, -1, 0)).
 
 wait 1.
 beeper:play(beep3).
@@ -165,7 +165,7 @@ until (distToStop - alt:radar) > -hoverslam_height {
         set engine:thrustlimit to thrustalignment * 100.
     }
 
-    set ship:control:translation to (translationvector * -up) / C_RCS_POWER.
+    //set ship:control:translation to (translationvector * -up) / C_RCS_POWER.
 
     wait 0.
 }
@@ -213,7 +213,7 @@ until ship:verticalspeed > -touchdown_spd {
         set engine:thrustlimit to thrustalignment * 100.
     }
 
-    set ship:control:translation to (translationvector * -up) / C_RCS_POWER.
+    //set ship:control:translation to (translationvector * -up) / C_RCS_POWER.
 
     wait 0.
 }
@@ -287,7 +287,7 @@ until hoverDone {
     print "THROTTLE: " + tval at (0, 24).
     set mainengine:thrustlimit to tval * 100.
 
-    set ship:control:translation to (tvec * -up) / C_RCS_POWER.
+    //set ship:control:translation to (tvec * -up) / C_RCS_POWER.
 }
 
 unlock throttle.
