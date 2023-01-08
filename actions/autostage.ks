@@ -20,7 +20,7 @@ function start_autostage {
             set delay to craft_config:stage_delay[stage:number].
         }
         print "[AUTOSTAGE] Stage :" + stage:number.
-        print "[AUTOSTAGE] Set delay :" + delay.
+        //print "[AUTOSTAGE] Set delay :" + delay.
 
         when ((stage:deltav:current < dv_limit) and (time:seconds - last_staged_time) > delay) or exit_autostage then {
             set dv_limit to 10.
@@ -35,7 +35,7 @@ function start_autostage {
                 set delay to craft_config:stage_delay[stage:number].
             }
 
-            print "[AUTOSTAGE] Set delay :" + delay.
+            //print "[AUTOSTAGE] Set delay :" + delay.
 
             if stop_autostage {
                 set autostage_active to false.

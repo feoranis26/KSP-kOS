@@ -1,3 +1,3 @@
-set droneship to vessel("JRTI")..
+set droneship to vessel("OCISLY")..
 
-run "0:/guided_hoverslam"(droneship, 50, 0.7, 3).
+run "0:/guided_hoverslam"(droneship, 10, 0.7, 3).
