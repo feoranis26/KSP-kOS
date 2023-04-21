@@ -3,7 +3,7 @@ parameter land_tgt, hoverslam_height is 25, safety_margin is 0.7, touchdown_spd 
 set C_RCS_POWER to 0.2.
 set C_ENGINE_POWER to 0.
 set C_CANCEL_CORR_MAG to 0.5.
-set C_ROCKET_HEIGHT to 38.
+set C_ROCKET_HEIGHT to 16.
 set C_HDESCENT_TRANSLATION_MAG to 0.2.
 set C_STEERING_DTERM to 1.
 
@@ -11,7 +11,7 @@ SET STEERINGMANAGER:PITCHPID:KD TO C_STEERING_DTERM.
 SET STEERINGMANAGER:YAWPID:KD TO C_STEERING_DTERM.
 SET STEERINGMANAGER:ROLLPID:KD TO C_STEERING_DTERM.
 
-set hoverslam_height to hoverslam_height + 10 + C_ROCKET_HEIGHT.
+set hoverslam_height to hoverslam_height + C_ROCKET_HEIGHT + 12.
 clearscreen.
 
 switch to 0.
@@ -50,7 +50,7 @@ set mainengine:thrustlimit to 100.
 
 print "PERFORMING COURSE CORRECTION!!!".
 
-lock impactpos to addons:tr:impactpos.
+lock impactpos to ship:body:geopositionof(addons:tr:impactpos:position - addons:tr:impactpos:position:normalized * 750).
 
 // when altitude < 25000 then {
 //     set impact_time to 0.
@@ -103,17 +103,19 @@ lock steerdir to heading(yawc, CORR_MAX_ANGLE, rollc).
 
 lock steering to steerdir.
 lock diff to (steerdir:forevector - facing:forevector).
-lock thrdiff to min((CORR_DIFF_TGT/diff:mag), 1).
+lock thrdiff to min((CORR_DIFF_TGT/diff:mag), 1) - 0.5.
 lock throttle to corrMag * thrdiff * CORR_MAX_THROTT.
 
-until abs(dLatitude + dLongitude) < 0.025 or altitude < 10000 {
-    print "diff: " + diff:mag at(0, 9).
-    print "VELOCITY IS: " + speedEast + ", " + speedNorth at (0, 10).
-    print "LATLNG DIFF IS: " + dLatitude + ", " + dLongitude at (0, 11).
-    print "THRUST_VECTOR: " + vec at (0,12).
-    print "LAND LATLNG IS: " + land_pos:lat + ", " + land_pos:lng at (0, 13).
-    print "CRNT LATLNG IS: " + impactpos:lat + ", " + impactpos:lng at (0, 14).
-    print "VECTOR: " + v(0, 0, 1) * steerdir at (0, 15).
+if abs(dLatitude + dLongitude) > 0.1 {
+    until abs(dLatitude + dLongitude) < 0.025 or altitude < 10000 {
+        print "diff: " + diff:mag at(0, 9).
+        print "VELOCITY IS: " + speedEast + ", " + speedNorth at (0, 10).
+        print "LATLNG DIFF IS: " + dLatitude + ", " + dLongitude at (0, 11).
+        print "THRUST_VECTOR: " + vec at (0,12).
+        print "LAND LATLNG IS: " + land_pos:lat + ", " + land_pos:lng at (0, 13).
+        print "CRNT LATLNG IS: " + impactpos:lat + ", " + impactpos:lng at (0, 14).
+        print "VECTOR: " + v(0, 0, 1) * steerdir at (0, 15).
+    }
 }
 
 print "-------------------------------------------" at (0, 9).
@@ -137,9 +139,10 @@ unlock rollc.
 lock throttle to 1.
 set mainengine:thrustlimit to 0.
 
-lock vector_mag to choose -3 if altitude < 16000 and ship:airspeed > 400 else 2 * mainengine:thrustlimit / 100.
+lock vector_mag to 0.//choose -3 if altitude < 16000 and ship:airspeed > 400 else 2 * mainengine:thrustlimit / 100.
 
-lock steering to lookdirup(-(velocity:surface:normalized + translationvector:normalized * min(translationvector:mag, 0.5) * vector_mag), v(0, -1, 0)).
+lock stval to -(velocity:surface:normalized + translationvector:normalized * min(translationvector:mag, 1) * vector_mag).
+lock steering to lookdirup(stval, v(0, -1, 0)).
 
 wait 1.
 beeper:play(beep3).
@@ -158,6 +161,15 @@ lock engineSafetyMargin to engineLiftPower * 0.9. //Safety margin because the ca
 lock timeToStop to abs((ship:verticalspeed) / engineSafetyMargin).
 lock distToStop to abs((ship:verticalspeed) * timeToStop / 2).
 
+set trvec_draw to vecDraw(v(0, 0, 0), translationvector, red, "TRVEC", 2, false, 0.5, true, true).
+set upvec_draw to vecDraw(v(0, 0, 0), prograde:upvector, red, "UP", 4, false, 0.2, true, true).
+set fwvec_draw to vecDraw(v(0, 0, 0), prograde:upvector, red, "FW", 20, false, 0.2, true, true).
+set rtvec_draw to vecDraw(v(0, 0, 0), prograde:upvector, red, "RT", 4, false, 0.2, true, true).
+
+when altitude < 3200 then{
+    lock impactpos to addons:tr:impactpos.
+}
+
 until (distToStop - alt:radar) > -hoverslam_height {
     print "--------- !HOVERSLAM IN PROGRES!  --------" at (0, 13).
     print "--------- !    BURN IMMINENT   !  --------" at (0, 14).
@@ -174,10 +186,21 @@ until (distToStop - alt:radar) > -hoverslam_height {
     for engine in engines {
         set thrustvector to (engine:facing:forevector).
         set thrustalignment to -vdot(thrustvector, translationvector).
-        set engine:thrustlimit to thrustalignment * 100 * C_ENGINE_POWER.
+        set engine:thrustlimit to (thrustalignment - 0.5) * 100 * C_ENGINE_POWER.
     }
 
-    //set ship:control:translation to (translationvector * -up) / C_RCS_POWER.
+
+    set trvec_draw:vec to translationvector.
+    set upvec_draw:vec to facing * v(0, 1, 0).
+    set fwvec_draw:vec to facing * v(0, 0, 1).
+    set rtvec_draw:vec to facing * v(1, 0, 0).
+
+
+    set ship:control:top to -vdot(facing * v(0, 1, 0), translationvector).
+    set ship:control:fore to vdot(facing * v(0, 0, 1), translationvector).
+    set ship:control:starboard to -vdot(facing * v(1, 0, 0), translationvector).
+
+    //set ship:control:translation to (translationvector *FACING) / C_RCS_POWER.
 
     wait 0.
 }
@@ -212,14 +235,25 @@ when ship:verticalspeed > -touchdown_spd then{
     lock throttle to 0.
 }
 
-until ship:verticalspeed > -touchdown_spd {
+//lock alt_mag to choose 1 - (1 - min(max(altitude - 2500, 0), 2500) / 2500) ^2 if altitude > 1000 else 1.
+//lock mag_stval to stval * alt_mag.
+//lock mag_up to up:forevector * (1 - alt_mag).
+//lock steering to lookdirup(mag_stval + mag_up, v(0, -1, 0)).
+
+//lock st_vec to choose stval - up:forevector * 0.5 if altitude > 1000 else stval.
+//lock steering to lookdirup(st_vec, v(0, -1, 0)).
+
+
+
+
+until ship:verticalspeed > -touchdown_spd or altitude < hoverslam_height {
     print "-- !HOVERSLAM IN PROGRES! --" at (0, 17).
     print "-- !!!!!!DECELERATE!!!!!! --" at (0, 18).
     print "ALTITUDE IS: " + ship:altitude at (0, 19).
     print "BURN DISTANCE IS: " + distToStop at (0, 20).
     print "VECTOR MAG: " + vector_mag at (0, 21).
-    if mod(time:seconds, 0.25) < 0.125 {beeper:play(beep2).}
-    if mod(time:seconds, 0.25) > 0.125 {beeper:play(beep3).}
+    //if mod(time:seconds, 0.75) < 0.375 {beeper:play(beep2).}
+    //if mod(time:seconds, 0.75) > 0.375 {beeper:play(beep3).}
 
     for engine in engines {
         set thrustvector to (engine:facing:forevector).
@@ -227,7 +261,14 @@ until ship:verticalspeed > -touchdown_spd {
         set engine:thrustlimit to thrustalignment * 100 * C_ENGINE_POWER.
     }
 
-    //set ship:control:translation to (translationvector * -up) / C_RCS_POWER.
+    set trvec_draw:vec to translationvector.
+    set upvec_draw:vec to facing * v(0, 1, 0).
+    set fwvec_draw:vec to facing * v(1, 0, 0).
+    set rtvec_draw:vec to facing * v(1, 0, 0).
+
+    set ship:control:top to -vdot(facing * v(0, 1, 0), translationvector).
+    set ship:control:fore to vdot(facing * v(0, 0, 1), translationvector).
+    set ship:control:starboard to -vdot(facing * v(1, 0, 0), translationvector).
 
     wait 0.
 }
@@ -289,7 +330,7 @@ until hoverDone {
     print "VERTICAL DESCENT!" at (0, 21).
     print "VELOCITY IS: " + speedEast + ", " + speedNorth at (0, 22).
     print "CORRECTN IS: " + tvec:x + ", " + tvec:z at (0, 23).
-    if (t < 0.125 and t > 0.1) or (t < 0.725 and t > 0.7) {beeper:play(bip).}
+    //if (t < 0.125 and t > 0.1) or (t < 0.725 and t > 0.7) {beeper:play(bip).}
     wait 0. // yield
 
     for engine in engines {
@@ -300,6 +341,10 @@ until hoverDone {
 
     print "THROTTLE: " + tval at (0, 24).
     set mainengine:thrustlimit to tval * 100.
+
+    set ship:control:top to -vdot(facing * v(0, 1, 0), tvec).
+    set ship:control:fore to vdot(facing * v(0, 0, 1), tvec).
+    set ship:control:starboard to -vdot(facing * v(1, 0, 0), tvec).
 
     //set ship:control:translation to (tvec * -up) / C_RCS_POWER.
 }
